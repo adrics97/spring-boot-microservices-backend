@@ -1,0 +1,19 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/usersdb}
+    username: ${SPRING_DATASOURCE_USERNAME:users}
+    password: ${SPRING_DATASOURCE_PASSWORD:secret}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+logging:
+  level:
+    root: WARN
+

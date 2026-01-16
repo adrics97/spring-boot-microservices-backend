@@ -1,0 +1,85 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    environment:
+      POSTGRES_DB: usersdb
+      POSTGRES_USER: users
+      POSTGRES_PASSWORD: users
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U users -d usersdb" ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  users-service:
+    build: ./users-service
+    container_name: users-service
+    environment:
+
+      SPRING_PROFILES_ACTIVE: docker
+
+      # DB (ajusta nombre DB/user/pass si usas otros)
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/usersdb
+      SPRING_DATASOURCE_USERNAME: users
+      SPRING_DATASOURCE_PASSWORD: users
+
+      # JWT (el mismo que gateway)
+      JWT_SECRET: ${JWT_SECRET}
+
+      # Puerto interno (si lo necesitas explícito)
+      SERVER_PORT: 8081
+    ports:
+      - "8081:8081"
+    depends_on:
+      - postgres
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q UP" ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  orders-service:
+    build: ./orders-service
+    container_name: orders-service
+    environment:
+      # Si en dev usas H2 / in-memory, activa perfil dev
+      SPRING_PROFILES_ACTIVE: dev
+      JWT_SECRET: ${JWT_SECRET}
+      SERVER_PORT: 8082
+
+      # Para que orders llame a users dentro de docker
+      USERS_BASE_URL: http://users-service:8081
+    ports:
+      - "8082:8082"
+    depends_on:
+      - users-service
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health | grep -q UP" ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      SERVER_PORT: 8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      - users-service
+      - orders-service
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP" ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  pgdata:
